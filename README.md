@@ -4,10 +4,10 @@ Utility to convert pre ZC158 language files to ZC158 array format.
 This is imperfect as there are too many oddities in the original files to do a 100% automatic conversion.
 This will create lang. copies of the files in the correct places to enable comparison with the originals for manual tweaking.
 
-## Useage
-1) DO NOT USE ON A LIVE SITE.
-2) TRY THIS ON A COPY OF YOUR LIVE SITE
-3) DO NOT USE ON A LIVE SITE.
+## Usage
+1. DO NOT USE ON A LIVE SITE.
+2. TRY THIS ON A COPY OF YOUR LIVE SITE
+3. DO NOT USE ON A LIVE SITE.
 
 IS THAT CLEAR ENOUGH?
 
@@ -25,6 +25,7 @@ Don't worry about them matching the original english file equivalents now, manua
 
 There are some options at the start of the file. Edit as required. I suggest you do the shopfront first so you only half-break your shop!
 
+```
 $language_to_convert = 'spanish'; //set to your language fileset name
 
 $convert_admin_files = false; // set to true to create admin files
@@ -33,13 +34,16 @@ $convert_shopfront_files = false; // set to true to create shopfront files
 
 $allow_create_files = false; // prevent any file creation or WILL OVERWRITE THE NEW FILES EACH TIME THIS FILE IS RUN!!!
 
+$unlink_after_create = false; // prevent any file removal or WILL REMOVE THE OLD FILES EACH TIME THIS FILE IS RUN!!!
+
 $debug = false; //set to true to display processing info
+```
 
 2) Log into your admin
-3) Manually type the filename: YOUR_ADMIN/zz_lang_creator.php
+3) Manually type the filename: `YOUR_ADMIN/zz_lang_creator.php`
 If no options have been changed, it will not do anything.
 
-If you have set to $allow_create_files to true, new files prefixed with .lang will be created in the same places.
+If you have set `$allow_create_files` to `true`, new files prefixed with `.lang` will be created in the same places.
 
 Refreshing the shopfront will now result in a white screen of death and one or more debug log files which will indicate the location of the error.
 There will be multiple errors for various reasons.
@@ -52,24 +56,33 @@ There will be a comment fragments breaking the format and also embedded constant
 
 For example
 
+```
 define('BOX_GV_ADMIN_QUEUE', 'Listado de ' . TEXT_GV_NAMES);
+```
 
 becomes
 
+```
    'BOX_GV_ADMIN_QUEUE' => 'Listado de ' . '%%TEXT_GV_NAMES%%',
+```
 
-In the subdirectory language/YOURLANGUAGE/
+In the subdirectory `language/YOURLANGUAGE/`
 there are now a lot of files, old and new mixed.
 I suggest as you review/compare a file, rename the old one for future reference and eventual deletion
 
-e.g. z_about_us.OLD php
+e.g. `z_about_us.OLD php`
 
 Thus they wil get separated from the lang. files and also not be included as overrides to the lang. files.
 
 ## How it works
 The script parses the hard-coded paths and retrieves a list of the files therein.
 
-It parses each file using basic search and replace and create a new file prefixed with .lang in the same place.
+It parses each file using basic search and replace and create a new file prefixed with `.lang` in the same place.
 
 It was not intended to be 100% comprehensive and to continue trying to make it perfect is subject to the law of diminishing returns, so I will not be making more changes to it.
 But feel free to try.
+
+### Documentation Links 
+
+- [1.5.8 Language Files](https://docs.zen-cart.com/dev/languages/158_language_files/)
+
