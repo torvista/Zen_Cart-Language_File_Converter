@@ -77,7 +77,7 @@ Thus they wil get separated from the lang. files and also not be included as ove
 ## How it works
 The script parses the hard-coded paths and retrieves a list of the files therein.
 
-It parses each file using basic search and replace and create a new file prefixed with `.lang` in the same place.
+It parses each file using basic search and replace and creates a new file prefixed with `.lang` in the same place.
 
 It was not intended to be 100% comprehensive and to continue trying to make it perfect is subject to the law of diminishing returns, so I will not be making more changes to it.
 But feel free to try.
