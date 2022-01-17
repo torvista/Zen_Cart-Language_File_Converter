@@ -11,6 +11,8 @@ $convert_shopfront_files = false; // set to true to create shopfront files
 
 $allow_create_files = false; // prevent any file creation or WILL OVERWRITE THE NEW FILES EACH TIME THIS FILE IS RUN!!!
 
+$unlink_after_create = false; // prevent any file removal or WILL REMOVE THE OLD FILES EACH TIME THIS FILE IS RUN!!!
+
 $debug = false; //set to true to display processing info
 
 /////////////////////////////////////////////
@@ -128,6 +130,7 @@ if (!function_exists('mv_printVar')) {//debugging tool only
 
                 //remove comments
                 $contents = preg_replace('!/\*.*?\*/!s', '', $contents);
+                $contents = preg_replace('!;(\s*)//(.*)!', ";\n", $contents);
                 // echo $contents;die;
                 foreach (token_get_all($contents) as $token) {
                     if ($token[0] !== T_COMMENT) {
@@ -159,11 +162,23 @@ if (!function_exists('mv_printVar')) {//debugging tool only
                 $contents = str_replace("', '", "','", $contents);
                 $contents = str_replace("',  '", "','", $contents);
 
+                // Just in case it's a quote comma then space double 
+                // quote or space constant, deal with that too.
+                $contents = str_replace("', ", "',", $contents);
+                
                 //remove "define"
                 $contents = str_replace("define('", "    '", $contents);
 
-                //replace middle comma with  =>
-                $contents = str_replace("','", "' => '", $contents);
+                // Fix zen_href_link calls before fixing comma
+                $pattern = "/,(\s)*'',(\s)*'SSL'\)/"; 
+                $replacement = ")"; 
+                $contents = preg_replace($pattern, $replacement, $contents);
+                $pattern = "/,(\s)*'',(\s)*'NONSSL'\)/"; 
+                $replacement = ")"; 
+                $contents = preg_replace($pattern, $replacement, $contents);
+                
+                //replace comma with  =>
+                $contents = str_replace("',", "' => ", $contents);
 
                 //remove trailing );
                 $contents = str_replace(");", ",", $contents);
@@ -186,6 +201,9 @@ if (!function_exists('mv_printVar')) {//debugging tool only
                      file_put_contents($filename_lang, $contents);
                     echo '<p>New file created:<b>' . $filename_lang . '</b></p>';
                     echo '<hr style="text-align:left;width:75%;margin-right:100%">';
+                    if ($unlink_after_create) { 
+                       unlink($filename); 
+                    }
                 } else {
                     echo '<p>New file would be created (currently disabled in script):<b>' . $filename_lang . '</b></p>';
                 }
