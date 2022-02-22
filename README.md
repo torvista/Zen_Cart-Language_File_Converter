@@ -1,4 +1,7 @@
 # Zen Cart - Language File Converter
+
+## STOP PRESS: I have an unpolished version which works MUCH better than the version available here...please contact me if you wish to do the conversion.
+
 Utility to convert pre ZC158 language files to ZC158 array format.
 
 This is imperfect as there are too many oddities in the original files to do a 100% automatic conversion.
