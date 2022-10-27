@@ -1,6 +1,5 @@
 # Zen Cart - Language File Converter
 
-## STOP PRESS: I have an unpolished version which works MUCH better than the version available here...please contact me if you wish to do the conversion.
 
 Utility to convert pre ZC158 language files to ZC158 array format.
 
@@ -9,7 +8,7 @@ This will create lang. copies of the files in the correct places to enable compa
 
 ## Usage
 1. DO NOT USE ON A LIVE SITE.
-2. TRY THIS ON A COPY OF YOUR LIVE SITE
+2. USE THIS ON A DEVELOPMENT COPY OF YOUR LIVE SITE
 3. DO NOT USE ON A LIVE SITE.
 
 IS THAT CLEAR ENOUGH?
@@ -24,34 +23,45 @@ Don't worry about them matching the original english file equivalents now, manua
 
 3. Copy this conversion script (single file) into your admin directory: from here it can access the shopfront files too.
 
-4. Open the file to edit it.
-
 There are some options at the start of the file. Edit as required. I suggest you do the shopfront first so you only half-break your shop!
 
 ```
-$language_to_convert = 'spanish'; //set to your language fileset name
+//set to fileset/folder name of the files to be converted
+$language_to_convert = 'spanish';
 
-$convert_admin_files = false; // set to true to create admin files
+// set to true to target admin files
+$convert_admin_files = false;
 
-$convert_shopfront_files = false; // set to true to create shopfront files
+// set to true to target shopfront files
+$convert_shopfront_files = false;
 
-$allow_create_files = false; // prevent any file creation or WILL OVERWRITE THE NEW FILES EACH TIME THIS FILE IS RUN!!!
+// set to true to allow processing of selected target and creation of files.
+// THIS WILL OVERWRITE THE NEW lang FILES EACH TIME THIS FILE IS RUN!!! SO SET TO FALSE AFTER THE FIRST SUCCESSFUL RUN (a run with no script errors).
+$allow_create_files = true;
 
-$unlink_after_create = false; // prevent any file removal or WILL REMOVE THE OLD FILES EACH TIME THIS FILE IS RUN!!!
+// integer 0 - leave original files in place
+// 1 - rename original files to *.OLD php so they are ignored: RECOMMENDED for future reference as some constants have been moved to other files
+// 2 - delete the original files
+$post_create_action = 0;
 
-$debug = false; //set to true to display processing info
+//true/false to show processing info
+$debug = true;
+
+//1 for find-replace (original method attempted), 2 for tokens (works better)
+$conversion_method = 2;
 ```
 
-2) Log into your admin
-3) Manually type the filename: `YOUR_ADMIN/zz_lang_creator.php`
+4. Log into your admin
+
+5. Manually type the filename: `YOUR_ADMIN/zz_lang_creator.php`
 If no options have been changed, it will not do anything.
 
 If you have set `$allow_create_files` to `true`, new files prefixed with `.lang` will be created in the same places.
 
-Refreshing the shopfront will now result in a white screen of death and one or more debug log files which will indicate the location of the error.
+If the original language files were in use/registered, refreshing the shopfront will now result in a white screen of death and one or more debug log files which will indicate the location of the error.
 There will be multiple errors for various reasons.
 
-IF YOU RUN THE SCRIPT AGAIN IT WILL OVERWRITE YOUR CHANGES SO IMMEDIATELY RESET THE OPTIONS TO PREVENT THIS.
+IF YOU RUN THE SCRIPT AGAIN IT WILL OVERWRITE YOUR CHANGES SO IMMEDIATELY RESET THE OPTIONS TO PREVENT THIS, OR REMOVE/RENAME THE FILE.
 
 Use the information in the debug logs to correct the errors by comparing the file with the original.
 It will help to use a code editor to highlight syntax errors.
@@ -78,12 +88,14 @@ e.g. `z_about_us.OLD php`
 Thus they wil get separated from the lang. files and also not be included as overrides to the lang. files.
 
 ## How it works
+### Method 1
+Original attempt 
 The script parses the hard-coded paths and retrieves a list of the files therein.
 
 It parses each file using basic search and replace and creates a new file prefixed with `.lang` in the same place.
 
-It was not intended to be 100% comprehensive and to continue trying to make it perfect is subject to the law of diminishing returns, so I will not be making more changes to it.
-But feel free to try.
+### Method 2
+The script parses the files into tokens which works much better.
 
 ### Documentation Links 
 
