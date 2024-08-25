@@ -1,14 +1,15 @@
 <?php
+// **** READ THE README FIRST *****
+// Place this file in your admin folder. Log into admin and type the filename ADMIN/AA_lang_creator.php.
 
-//Place this file in your admin folder. Log into admin and type the filename ADMIN/zz_lang_creator.php.
 declare(strict_types=1);
 /**
  * @link    https://github.com/torvista/Zen_Cart-Language_File_Converter
- * @version $Id: 27/10/2022 torvista
+ * @version $Id: 24/08/2024 torvista
  */
 //
 //set to fileset/folder name of the files to be converted
-$language_to_convert = 'spanish';
+$language_to_convert = 'english';
 
 // set to true to target admin files
 $convert_admin_files = false;
@@ -119,7 +120,7 @@ function is_constant1($token): bool
         || $token === T_DNUMBER;
 }
 
-/** funciotn used onlky for line-by-line examination of the token processing
+/** function used only for line-by-line examination of the token processing
  * @param $state
  * @param $token
  *
@@ -137,7 +138,6 @@ function dump1($state, $token): void
 
 /**
  * @param $value
- *
  * @return array|string|string[]|null
  */
 function strip($value)
@@ -269,20 +269,20 @@ function strip($value)
                         $pattern = "/,(\s)*'',(\s)*'NONSSL'\)/";
                         $contents = preg_replace($pattern, $replacement, $contents);
 
-                        //replace comma with  =>
+                        //replace comma with "=>"
                         $contents = str_replace("',", "' => ", $contents);
 
-                        //remove trailing );
+                        //remove trailing ");"
                         $contents = str_replace(");", ",", $contents);
 
-                        //find start of array list
+                        //find start of the array list
                         $start = strpos($contents, "    '");
                         if ($start === false) {
                             echo '<p class="messageStackWarning">Error: start of constants not identified.</p>';
                         }
                         $contents = substr_replace($contents, '$define = [' . "\n", $start, 0);
 
-                        //end of array list
+                        //end of the array list
                         $contents .= "\n" . '];';
                         $contents .= "\n\n" . 'return $define;';
                         break;
@@ -316,17 +316,17 @@ function strip($value)
                                     $state = 3;
                                 } elseif ($state === 4 && is_constant1(
                                         $token[0]
-                                    )) { // separator , has been passed, capture constant CONTENT
+                                    )) { // separator "," has been passed, capture constant CONTENT
                                     $value .= $token[1];
                                     //$state = 5;
                                 }
                             } else {
                                 $symbol = trim($token);
-                                if ($symbol === '(' && $state === 1) { //previous token was a "define", now the start ( is detected: set state 2
+                                if ($symbol === '(' && $state === 1) { // the previous token was a "define", now the start "(" is detected: set state 2
                                     $state = 2;
-                                } elseif ($symbol === ',' && $state === 3) {//constant name already captured, separator found: set state 4
+                                } elseif ($symbol === ',' && $state === 3) { // constant name already captured, separator found: set state 4
                                     $state = 4;
-                                } elseif ($symbol === ')' && $state === 4) {//closing bracket detected, $value is complete: reset to state 0
+                                } elseif ($symbol === ')' && $state === 4) { // closing bracket detected, $value is complete: reset to state 0
                                     $defines[$key] = $value;
                                     $value = '';
                                     $state = 0;
@@ -341,7 +341,7 @@ function strip($value)
                         foreach ($defines as $k => $v) {
                             $defines_list .= "    $k => $v,\n"; //ident as four spaces
                         }
-                        //echo str_replace("\n", "\n<br>", $defines_list);//show content of defines
+                        //echo str_replace("\n", "\n<br>", $defines_list); // show content of defines
                         $contents = "<?php\n" . '$define' . " = [\n";
                         $contents .= $defines_list;
                         $contents .= "];\n\nreturn " . '$define;';
