@@ -1,62 +1,55 @@
 <?php
 // **** READ THE README FIRST *****
-// Place this file in your admin folder. Log into admin and type the filename ADMIN/AA_lang_creator.php.
+// Place this file in your admin folder. Log into admin and manually type the filename ADMIN_FOLDER/dev-lang_creator.php.
+// (the "dev-" prefix hides the file from Git)
 
 declare(strict_types=1);
 /**
- * @link    https://github.com/torvista/Zen_Cart-Language_File_Converter
- * @version $Id: 24/08/2024 torvista
+ * @link https://github.com/torvista/Zen_Cart-Language_File_Converter
+ * @note uses tokens
+ * @version $Id: 08/04/2026 torvista & ChatGPT
  */
-//
-//set to fileset/folder name of the files to be converted
-$language_to_convert = 'english';
 
-// set to true to target admin files
-$convert_admin_files = false;
+/**
+ * @var $PHP_SELF
+ */
 
-// set to true to target shopfront files
-$convert_shopfront_files = false;
+require 'includes/application_top.php';
+$languages = zen_get_languages();
 
-// set to true to allow processing of selected target and creation of files.
-// THIS WILL OVERWRITE THE NEW lang FILES EACH TIME THIS FILE IS RUN!!! SO SET TO FALSE AFTER THE FIRST SUCCESSFUL RUN (a run with no script errors).
-$allow_create_files = true;
+$language_to_convert = '';
+$languages_pulldown = [];
+foreach ($languages as $key => $value) {
+    $languages_pulldown[$key]['id'] = $value['directory'];
+    $languages_pulldown[$key]['text'] = $value['directory'];
+    if (!empty($_POST['language_to_convert']) && $value['directory'] === $_POST['language_to_convert']) {
+        $language_to_convert = $_POST['language_to_convert'];
+    }
+}
+
+//admin or storefront
+$fileset_source = empty($_POST['fileset_source']) ? '' : zen_db_prepare_input($_POST['fileset_source']);
+$create_files = !empty($_POST['create_files']);
 
 // integer 0 - leave original files in place
-// 1 - rename original files to *.OLD php so they are ignored: RECOMMENDED for future reference as some constants have been moved to other files
-// 2 - delete the original files
-$post_create_action = 0;
+// 1 - rename original files to *.LEGACY php so they are ignored: RECOMMENDED for future reference as some constants have been moved to other files
+$legacy_file_action = empty($_POST['legacy_file_action']) ? 0 : (int)$_POST['legacy_file_action'];
+unset($_POST);
 
-//true/false to show processing info
-$debug = true;
-
-//1 for find-replace (original method attempted), 2 for tokens (works better)
-$conversion_method = 2;
-
-///////////////////////////////////////////////////////////////////////////////
-define(
-    'TEXT_INTRO',
-    '<h1>Under no circumstances should this file be used on a production website: use a working development copy to develop your new language</h1>
-    <p>Please note that the conversion is only that, a conversion of the old files to the new format. It will not add/remove constants to equate the new files to the english lang files...that is a manual process you will need to do by hand using Beyond Compare or equivalent.</p>
-    <h2>Read the comments and options in the file itself</h2>
-    <p>Once you have read the comments and set the options to create the lang files and do something (or not) with the original source files, it will do so <b>every time</b> you run the file. So, unless there are processing errors or you wish to improve the results, you should only need to run this once and then remove it from your server once you start to do the edit/comparison by hand, to prevent accidentally overwriting your subsequent work.</p>
-    <p>These new .lang files will be missing new constants and have surplus constants that have been combined/removed or moved elsewhere. Consequently, <b>do not register the language until you have done a complete comparison with the english fileset and made the definition lists equivalent</b>. Otherwise you will break the site unnecessarily.<br>Once you have done that, you may register the language. If it (probably) causes a blank page, there will be a debug log to indicate the problem location.</p>
-    <p>Comments are welcome in the <a href="https://github.com/torvista/Zen_Cart-Language_File_Converter" target="_blank">GitHub</a>, code improvements even more so. Which would be a first.</p>'
-);
-define('DEBUG_MODE_ON', '<p><b>Debug mode is ON ($debug = true), showing array processing.</b></p>');
-require(__DIR__ . '/includes/application_top.php');
 $paths_to_scan = [];
-if ($convert_admin_files) {
+if ($fileset_source === 'admin') {
     $paths_to_scan = [
         DIR_FS_ADMIN . DIR_WS_LANGUAGES,
         DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/',
         DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/extra_definitions/',
         DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/modules/newsletters/',
+        //plugins
+        DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/dbio/',
     ];
 }
-if ($convert_shopfront_files) {
-    array_push(
-        $paths_to_scan,
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/aa_test/',
+
+if ($fileset_source === 'storefront') {
+    $paths_to_scan = [
         DIR_FS_CATALOG_LANGUAGES,
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/classic/',
@@ -76,9 +69,11 @@ if ($convert_shopfront_files) {
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/responsive_classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/responsive_classic/'
-    );
+    ];
 }
-if (!function_exists('mv_printVar')) {//formatted debugging output only
+
+// function only used for outputting formatted debugging output to browser
+if (!function_exists('mv_printVar')) {
     /**
      * @param $a
      */
@@ -104,51 +99,182 @@ if (!function_exists('mv_printVar')) {//formatted debugging output only
 }
 
 /**
- * @param $token
- *
- * @return bool
- */
-function is_constant1($token): bool
-{
-    //T_CONSTANT_ENCAPSED_STRING	"foo" or 'bar'
-    //T_STRING	parent, self, etc.	identifiers, e.g. keywords like parent and self, function names, class names and more are matched. See also T_CONSTANT_ENCAPSED_STRING.
-    //T_LNUMBER	123, 012, 0x1ac, etc.	integers
-    //T_DNUMBER	0.12, etc.	floating point numbers
-    return $token === T_CONSTANT_ENCAPSED_STRING
-        || $token === T_STRING
-        || $token === T_LNUMBER
-        || $token === T_DNUMBER;
-}
-
-/** function used only for line-by-line examination of the token processing
- * @param $state
- * @param $token
- *
+ * @param  string  $source_filename
+ * @param  bool  $create_file
  * @return void
  */
-function dump1($state, $token): void
+function convertFileToLang(string $source_filename, bool $create_file = false): void
 {
-    if (is_array($token)) {
-        echo "$state: " . token_name($token[0]) . " [$token[1]] on line $token[2]";
-    } else {
-        echo "$state: Symbol '$token'";
+    $code = file_get_contents($source_filename);
+    $tokens = token_get_all($code);
+
+    $output = "<?php\n";
+    $arrayBody = "";
+
+    $count = count($tokens);
+
+    $firstDocblockCaptured = false;
+    $startedArrayContent = false;
+
+    $lastLine = 1;
+
+    for ($i = 0; $i < $count; $i++) {
+        $token = $tokens[$i];
+
+        $tokenId = is_array($token) ? $token[0] : null;
+        $tokenText = is_array($token) ? $token[1] : $token;
+        $tokenLine = is_array($token) ? $token[2] : $lastLine;
+
+        // ---- FIRST DOCBLOCK (top of file) ----
+        if ($tokenId === T_DOC_COMMENT) {
+            if (!$firstDocblockCaptured) {
+                $output .= trim($tokenText) . "\n\n";
+                $firstDocblockCaptured = true;
+            } else {
+                // Inline docblocks
+                if ($startedArrayContent) {
+                    $lineDiff = $tokenLine - $lastLine;
+                    if ($lineDiff > 1) {
+                        $arrayBody .= str_repeat("\n", $lineDiff - 1);
+                    }
+                }
+
+                $arrayBody .= "    " . trim($tokenText) . "\n";
+                $startedArrayContent = true;
+            }
+
+            $lastLine = $tokenLine;
+            continue;
+        }
+
+        // ---- NORMAL COMMENTS ----
+        if ($tokenId === T_COMMENT) {
+            if ($startedArrayContent) {
+                $lineDiff = $tokenLine - $lastLine;
+                if ($lineDiff > 1) {
+                    $arrayBody .= str_repeat("\n", $lineDiff - 1);
+                }
+            }
+
+            $arrayBody .= "    " . trim($tokenText) . "\n";
+            $startedArrayContent = true;
+
+            $lastLine = $tokenLine;
+            continue;
+        }
+
+        // ---- DEFINE HANDLING ----
+        if ($tokenId === T_STRING && strtolower($tokenText) === 'define') {
+            if ($startedArrayContent) {
+                $lineDiff = $tokenLine - $lastLine;
+                if ($lineDiff > 1) {
+                    $arrayBody .= str_repeat("\n", $lineDiff - 1);
+                }
+            }
+
+            // Move to "("
+            while ($i < $count && ($tokens[$i] !== '(')) {
+                $i++;
+            }
+
+            // Get constant name
+            $i++;
+            while ($i < $count && is_array($tokens[$i]) && $tokens[$i][0] === T_WHITESPACE) {
+                $i++;
+            }
+
+            $constName = trim($tokens[$i][1], "'\"");
+
+            // Move to comma
+            while ($i < $count && ($tokens[$i] !== ',')) {
+                $i++;
+            }
+
+            // ---- CAPTURE VALUE (supports arrays, nested, multiline) ----
+            $i++;
+            $value = '';
+            $parenDepth = 1;
+
+            for (; $i < $count; $i++) {
+                $t = $tokens[$i];
+                $text = is_array($t) ? $t[1] : $t;
+
+                if ($text === '(') {
+                    $parenDepth++;
+                } elseif ($text === ')') {
+                    $parenDepth--;
+                    if ($parenDepth === 0) {
+                        break;
+                    }
+                }
+
+                $value .= $text;
+            }
+
+            $value = trim($value);
+
+            // Add to array
+            $arrayBody .= "    '$constName' => $value,\n";
+            $startedArrayContent = true;
+
+            // Skip to semicolon
+            while ($i < $count && ($tokens[$i] !== ';')) {
+                $i++;
+            }
+
+            $lastLine = $tokenLine;
+            continue;
+        }
+
+        $lastLine = $tokenLine;
     }
-    echo "\n<br>\n<br>";
+
+    // ---- FINAL OUTPUT ----
+    $output .= "\$define = [\n";
+    $output .= rtrim($arrayBody, "\n") . "\n";
+    $output .= "];\n\nreturn \$define;\n";
+
+    // ---- WRITE FILE ----
+    $dir = dirname($source_filename);
+    $filename = basename($source_filename);
+    $newFile = $dir . DIRECTORY_SEPARATOR . 'lang.' . $filename;
+
+    if ($create_file) {
+        file_put_contents($newFile, $output);
+        echo '<p>New file created:<b>"' . $newFile . '"</b></p>';
+    } else {
+        echo '<p>New file <em>would</em> be created:<b>"' . $newFile . '"</b></p>';
+    }
 }
 
 /**
- * @param $value
- * @return array|string|string[]|null
+ * @param  string  $filename
+ * @param  int  $legacy_file_action
+ * @return void
  */
-function strip($value)
+function handle_legacy_file(string $filename, int $legacy_file_action = 0): void
 {
-    return preg_replace('!^([\'"])(.*)\1$!', '$2', $value);
+    switch ($legacy_file_action) {
+        //rename source files to *.LEGACY php
+        case (1):
+            $filename_new = substr_replace($filename, '.LEGACY php', strrpos($filename, '.php'));
+            $file_renamed = rename($filename, $filename_new);
+            if (!$file_renamed) {
+                echo '<p>Error: source file "' . $filename . '" NOT renamed to "' . $filename_new . '"</p>';
+            } else {
+                echo '<p>Source file "' . $filename . '" renamed to "' . $filename_new . '"</p>';
+            }
+            break;
+
+        //do nothing with the source files
+        default:
+            echo '<p>Source file "' . $filename . '" left in place</p>';
+    }
 }
 
 ?>
     <!doctype html>
-    <html <?php
-    echo HTML_PARAMS; ?>>
+    <html <?= HTML_PARAMS ?>>
     <head>
         <?php
         require DIR_WS_INCLUDES . 'admin_html_head.php'; ?>
@@ -163,231 +289,103 @@ function strip($value)
     <!-- body //-->
     <div class="container-fluid">
         <!-- body_text //-->
-        <h1>Create lang.*.php files from fileset : "<?php
-            echo $language_to_convert; ?>"</h1>
+        <h1>Developer Tool: Create lang.*.php files from legacy Language Files</h1>
+        <h2 class="mark">UNDER NO CIRCUMSTANCES SHOULD YOU EXECUTE THIS FILE ON YOUR WORKING/PRODUCTION SHOP: YOU WILL BREAK IT!</h2>
+        <p>The new files are unlikely to be 100% perfect and so will cause a white-screen-of-death (WSOD), requiring some manual fixes (just review the /log/debug files to determine where the fault lies).<br>
+            Consequently, you MUST use a duplicate (working) development copy of your shop to create and review the new files, stress-free.<br>
+            As these are <b>new</b> files causing the problem, there is no irreparable damage, just work though the debugs, there should be very few.</p>
+
+        <h3>Notes</h3>
+        <ul>
+            <li>The conversion only creates lang.* <b>equivalents</b> from the existing files. It will NOT add or remove constants to bring those files "up-to-date" to match the current english lang.* files.<br>
+                Hence this initial creation is only the start of the process: you still <b>must</b> do a manual compare of the english files vs. your files to ensure that all definitions are in place/match their english equivalents (by using Beyond Compare or similar).
+            </li>
+
+            <li>Do a Test Run to show the file paths being parsed...maybe you have some custom directory you need to add (in the script array).
+            </li>
+
+            <li>
+                If the source file define is a constant whose value is another constant,<br>
+                e.g<br>
+                <pre>define('BOX_TOOLS_GOOGLE_MERCHANT_CENTER', BOX_CONFIGURATION_GOOGLE_MERCHANT_CENTER);//Tools Menu</pre>
+                This will cause a WSOD in the lang. file: the value must be wrapped in '%%.....%%'.<br>
+                e.g<br>
+                <pre>'BOX_TOOLS_GOOGLE_MERCHANT_CENTER' => '%%BOX_CONFIGURATION_GOOGLE_MERCHANT_CENTER%%',</pre>
+            </li>
+
+            <li>The script will use any existing legacy file to create a lang. equivalent.<br>
+                If you run it a second time, and have left the original files in place (not renamed), the lang. files will be created again, overwriting any fixes you have done.<br>
+                So...don't run it twice on the same fileset or remove/rename the legacy files.
+            </li>
+
+            <li>
+                Comments are welcome in the <a href="https://github.com/torvista/Zen_Cart-Language_File_Converter" target="_blank">GitHub</a>, code improvements even more so. Which would be a first.
+            </li>
+        </ul>
         <?php
-        echo TEXT_INTRO;
-        if ($debug) {
-            echo DEBUG_MODE_ON;
-        }
-        if ($conversion_method === 1) {
-            $using_method = ' using method 1: find-replace';
-        } elseif ($conversion_method === 2) {
-            $using_method = ' using method 2: tokens';
-        } else {
-            $using_method = '';
-        }
-        if ($convert_admin_files) {
-            echo "<h2>Create lang.*.php files for admin$using_method.</h2>";
-        }
-        if ($convert_shopfront_files) {
-            echo "<h2>Create lang.*.php files for shopfront$using_method.</h2>";
-        }
-        if (!$convert_admin_files && !$convert_shopfront_files) {
-            echo '<h2>Neither Admin nor Shopfront files are currently set for conversion</h2>';
-        }
-        if ($debug) {
+        echo zen_draw_form('lang_creator', basename($PHP_SELF), parameters: 'class="form-inline"');
+        ?>
+        <fieldset>
+            <legend>Run Options</legend>
+            <div class="form-group">
+                <label>Language directory to convert: <?= zen_draw_pull_down_menu('language_to_convert', $languages_pulldown, parameters: 'class="form-control"') ?></label>
+            </div>
+            <br>
+            <div class="form-group control-label">Which fileset to process:<br>
+                <label>Admin <?= zen_draw_radio_field('fileset_source', 'admin', parameters: 'class="form-control" required') ?></label>&nbsp;&nbsp;
+                <label>Storefront <?= zen_draw_radio_field('fileset_source', 'storefront', parameters: 'class="form-control" required') ?></label>
+            </div>
+            <br>
+            <div class="form-group control-label">Legacy source files:<br>
+                <label>Leave them in place <?= zen_draw_radio_field('legacy_file_action', '0', parameters: 'class="form-control" required') ?></label>&nbsp;&nbsp;
+                <label>Rename to *.LEGACY php <?= zen_draw_radio_field('legacy_file_action', '1', parameters: 'class="form-control" required') ?></label>
+            </div>
+            <br>
+            <div class="form-group control-label">Action on "Run":<br>
+                <label>Test Run (no conversion/creation) <?= zen_draw_radio_field('create_files', '0', parameters: 'class="form-control" required') ?></label>&nbsp;&nbsp;
+                <label>Create the lang.* files <?= zen_draw_radio_field('create_files', '1', parameters: 'class="form-control" required') ?></label>
+            </div>
+            <br>
+            <button type="submit" onclick="return confirm('Sure?');">Run!</button>
+        </fieldset>
+        <?php
+        echo '</form>';
+
+        if (!empty($fileset_source)) {
+            echo "<h2>Creating lang.*.php files for $fileset_source</h2>";
             mv_printVar($paths_to_scan);
-        }
-        foreach ($paths_to_scan as $path_to_scan) {
-            echo '<h2>Path to scan: "' . $path_to_scan . '"</h2>';
-            $file_list = false;
-            //get the main language file
-            if (file_exists($path_to_scan . $language_to_convert . ".php")) {
-                $file_list = [$path_to_scan . $language_to_convert . ".php"];
-            } else {
-                $file_list = glob($path_to_scan . "*.php");
-            }
-            if ($file_list === false || count($file_list) === 0) {
-                echo '<h3>No files found in: "' . $path_to_scan . '"</h3>';
-                continue;
-            }
-            if ($debug) {
+
+            foreach ($paths_to_scan as $path_to_scan) {
+                echo '<h2>Path to scan: "' . $path_to_scan . '"</h2>';
+                $file_list = false;
+
+                //get the main language file
+                if (file_exists($path_to_scan . $language_to_convert . ".php")) {
+                    $file_list = [$path_to_scan . $language_to_convert . ".php"];
+                } else {
+                    $file_list = glob($path_to_scan . "*.php");
+                }
+                if ($file_list === false || count($file_list) === 0) {
+                    echo '<h3>No files found in: "' . $path_to_scan . '"</h3>';
+                    continue;
+                }
                 echo '$file_list: all files';
                 mv_printVar($file_list);
-            }
 
-            //filter out any pre-existing lang.*.php files
-            $file_list = preg_grep("/lang\./", $file_list, PREG_GREP_INVERT);
-            if ($debug) {
-                echo '$file_list: any pre-existing lang.*.php removed';
+                //filter out any pre-existing lang.*.php files
+                $file_list = preg_grep("/lang\./", $file_list, PREG_GREP_INVERT);
+
+                echo '$file_list: pre-existing lang.*.php files removed';
                 mv_printVar($file_list);
-            }
-            //mv_printVar($file_list);die;
-            foreach ($file_list as $filename) {
-                echo '<p>File to convert: <b>' . $filename . '</b></p>';
-                $contents = '';
-                switch ($conversion_method) {
-                    case 1: //find-replace
-                        $contents = trim(file_get_contents($filename));
 
-                        //remove comments
-                        $contents = preg_replace('!/\*.*?\*/!s', '', $contents);
-                        $contents = preg_replace('!;(\s*)//(.*)!', ";\n", $contents);
-                        // echo $contents;die;
-                        foreach (token_get_all($contents) as $token) {
-                            if ($token[0] !== T_COMMENT) {
-                                continue;
-                            }
-                            $contents = str_replace($token[1], '', $contents);
-                        }
-
-                        //remove empty lines
-                        $contents = preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", $contents);
-
-                        //remove php end tag
-                        $contents_length = strlen($contents);
-                        $pos_end_tag = strrpos($contents, "?>");
-                        if ($pos_end_tag === $contents_length - 2) {
-                            if ($debug) {
-                                echo '<p>php end tag "?>" found and removed<p>';
-                            }
-                            $contents = substr_replace($contents, '', $pos_end_tag, 2);
-                        }
-
-                        //make leading "define" structure consistent
-                        $contents = str_replace("define ('", "define('", $contents);
-                        $contents = str_replace("define ( '", "define('", $contents);
-
-                        //make definition comma separator consistent (no space)
-                        $contents = str_replace("' ,'", "','", $contents);
-                        $contents = str_replace("' , '", "','", $contents);
-                        $contents = str_replace("', '", "','", $contents);
-                        $contents = str_replace("',  '", "','", $contents);
-
-                        // Just in case it's a quote comma then space double
-                        // quote or space constant, deal with that too.
-                        $contents = str_replace("', ", "',", $contents);
-
-                        //remove "define"
-                        $contents = str_replace("define('", "    '", $contents);
-
-                        // Fix zen_href_link calls before fixing comma
-                        $pattern = "/,(\s)*'',(\s)*'SSL'\)/";
-                        $replacement = ")";
-                        $contents = preg_replace($pattern, $replacement, $contents);
-                        $pattern = "/,(\s)*'',(\s)*'NONSSL'\)/";
-                        $contents = preg_replace($pattern, $replacement, $contents);
-
-                        //replace comma with "=>"
-                        $contents = str_replace("',", "' => ", $contents);
-
-                        //remove trailing ");"
-                        $contents = str_replace(");", ",", $contents);
-
-                        //find start of the array list
-                        $start = strpos($contents, "    '");
-                        if ($start === false) {
-                            echo '<p class="messageStackWarning">Error: start of constants not identified.</p>';
-                        }
-                        $contents = substr_replace($contents, '$define = [' . "\n", $start, 0);
-
-                        //end of the array list
-                        $contents .= "\n" . '];';
-                        $contents .= "\n\n" . 'return $define;';
-                        break;
-
-                    case 2: //tokens
-                        $defines = [];
-                        $state = 0;
-                        $key = '';
-                        $value = '';
-
-                        $contents = trim(file_get_contents($filename));
-//remove empty lines
-                        //$contents = preg_replace("/(^[\r\n]*|[\r\n]+)[\s\t]*[\r\n]+/", "\n", $contents);
-                        $tokens = token_get_all($contents);
-                        $token = reset($tokens);
-                        while ($token) {
-                            //use this function for nitty-gritty examination of the tokens line by line
-                            // dump1($state, $token);
-                            //first check is for a recognised construct/not a single character
-                            if (is_array($token)) {
-                                if ($token[0] === T_WHITESPACE || $token[0] === T_COMMENT || $token[0] === T_DOC_COMMENT) {
-                                    // do nothing
-                                } elseif ($token[0] === T_STRING && strtolower(
-                                        $token[1]
-                                    ) === 'define') { //"define" detected, set state 1
-                                    $state = 1;
-                                } elseif ($state === 2 && is_constant1(
-                                        $token[0]
-                                    )) { // opening bracket has been passed, capture constant NAME: set state 3
-                                    $key = "'" . strip($token[1]) . "'";
-                                    $state = 3;
-                                } elseif ($state === 4 && is_constant1(
-                                        $token[0]
-                                    )) { // separator "," has been passed, capture constant CONTENT
-                                    $value .= $token[1];
-                                    //$state = 5;
-                                }
-                            } else {
-                                $symbol = trim($token);
-                                if ($symbol === '(' && $state === 1) { // the previous token was a "define", now the start "(" is detected: set state 2
-                                    $state = 2;
-                                } elseif ($symbol === ',' && $state === 3) { // constant name already captured, separator found: set state 4
-                                    $state = 4;
-                                } elseif ($symbol === ')' && $state === 4) { // closing bracket detected, $value is complete: reset to state 0
-                                    $defines[$key] = $value;
-                                    $value = '';
-                                    $state = 0;
-                                } elseif ($state === 4) {//found . of embedded constant: continue state 4
-                                    $value .= $symbol;
-                                }
-                            }
-                            $token = next($tokens);
-                        }
-//mv_printVar($defines);
-                        $defines_list = '';
-                        foreach ($defines as $k => $v) {
-                            $defines_list .= "    $k => $v,\n"; //ident as four spaces
-                        }
-                        //echo str_replace("\n", "\n<br>", $defines_list); // show content of defines
-                        $contents = "<?php\n" . '$define' . " = [\n";
-                        $contents .= $defines_list;
-                        $contents .= "];\n\nreturn " . '$define;';
-                        break;
+                foreach ($file_list as $filename) {
+                    echo '<p>File to convert: <b>"' . $filename . '"</b></p>';
+                    convertFileToLang($filename, $create_files);
+                    handle_legacy_file($filename, $legacy_file_action);
+                    echo '<hr style="text-align:left;width:75%;margin-right:100%;">';
                 }
-
-                $file_info = pathinfo($filename);
-                $filename_lang = $file_info['dirname'] . '/lang.' . $file_info['filename'] . '.php';
-
-                if ($allow_create_files) {
-                    file_put_contents($filename_lang, $contents);
-                    echo '<p>New file created:<b>' . $filename_lang . '</b></p>';
-                    switch ($post_create_action) {
-                        //rename old files to *.OLD php
-                        case (1):
-                            $filename_new = substr_replace($filename, '.OLD php', strrpos($filename, '.php'));
-                            $file_renamed = rename($filename, $filename_new);
-                            if (!$file_renamed) {
-                                echo '<p>error: source file "' . $filename . '" NOT renamed to "' . $filename_new . '"</p>';
-                            } elseif ($debug) {
-                                echo '<p>source file "' . $filename . '" renamed to "' . $filename_new . '"</p>';
-                            }
-                            break;
-
-                        //delete old files
-                        case (2):
-                            $file_deleted = unlink($filename);
-                            if (!$file_deleted) {
-                                echo '<p>error: source file "' . $filename . '" NOT deleted</p>';
-                            } elseif ($debug) {
-                                echo '<p>source file "' . $filename . ": deleted</p>";
-                            }
-                            break;
-
-                        //do nothing with the old files
-                        default:
-                            if ($debug) {
-                                echo '<p>source file "' . $filename . '" left in place</p>';
-                            }
-                    }
-                } else {
-                    echo '<p>New file <em>would</em> be created (currently disabled in script):<b>' . $filename_lang . '</b></p>';
-                }
-                echo '<hr style="text-align:left;width:75%;margin-right:100%">';
+                echo '<hr>';
             }
-            echo '<hr>';
         }
         ?>
         <!-- body_text_eof //-->

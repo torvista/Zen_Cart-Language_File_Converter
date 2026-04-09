@@ -1,67 +1,35 @@
 # Zen Cart - Language File Converter
 
-Utility to convert pre ZC158 language files to ZC158 array (lang.\*) format.
+Utility to convert legacy (pre-ZC158 language files that use ````define('CONSTANT_NAME', 'constant value')````) to the current array (lang.\*) format.
 
-This will create lang.\* copies of the files in the correct places to enable comparison with the originals for manual tweaking.
+This will create lang.\* copies of the files in the same locations to enable comparison with the originals for manual tweaking.
 
-The automatic conversion is imperfect as there are multiple minor oddities in the original files ... you WILL  need to manual fix the inconsistencies.
+The automatic conversion may be imperfect due to oddities in the original files... you WILL need to review/manually fix the inconsistencies, but these will all create debug logs to indicate the problem file.
 
 ## Usage
 1. DO NOT USE ON A LIVE SITE.
-2. USE THIS ON A DEVELOPMENT COPY OF YOUR LIVE SITE
+2. USE THIS ON A DEVELOPMENT COPY OF YOUR LIVE SITE: this work will break the page loading until you have fixed all the issues.
 3. DO NOT USE ON A LIVE SITE.
 
 IS THAT CLEAR ENOUGH?
 
 This script does not do encoding conversion. The original language files should be utf-8 already. If not, there is info online on how to do batch conversions. Not necessary for files that have no accents (multibyte characters) like english.
 
-1. Copy the original files to their correct locations.
-Don't worry about them matching the original english file equivalents now, manual checking/comparison will have to be done in any case.
+1. If you trying to update an old language pack, copy those files to their correct locations.
+Don't worry about them working or matching the original english file equivalents now, manual checking/comparison will have to be done in any case.
 
-1. Copy this conversion script (single file) into your admin directory: from here it can access the shopfront files too.  
-There are some options at the start of the file: READ THEM!  
-Edit as required. I suggest you do the shopfront first so you only half-break your shop!
-```
-//set to fileset/folder name of the files to be converted
-$language_to_convert = 'spanish';
+1. Copy this conversion script (single file) into your admin directory: from here it can access the shopfront files too.
 
-// set to true to target admin files
-$convert_admin_files = false;
+2. Log into your admin
 
-// set to true to target shopfront files
-$convert_shopfront_files = false;
+3. Manually type the filename: `YOUR_ADMIN/dev-lang_creator.php`
 
-// set to true to allow processing of selected target and creation of files.
-// THIS WILL OVERWRITE THE NEW lang FILES EACH TIME THIS FILE IS RUN!!! SO SET TO FALSE AFTER THE FIRST SUCCESSFUL RUN (a run with no script errors).
-$allow_create_files = true;
-
-// integer 0 - leave original files in place
-// 1 - rename original files to *.OLD php so they are ignored: RECOMMENDED for future reference as some constants have been moved to other files
-// 2 - delete the original files
-$post_create_action = 0;
-
-//true/false to show processing info
-$debug = true;
-
-//1 for find-replace (original method attempted), 2 for tokens (works better)
-$conversion_method = 2;
-```
-3. Log into your admin
-
-4. Manually type the filename: `YOUR_ADMIN/dev-lang_creator.php`
-If no options have been changed, it will not do anything.
-
-If you have set `$allow_create_files` to `true`, new files prefixed with `.lang` will be created in the same places.
-
-If the original language files were in use/registered, refreshing the shopfront will now result in a white screen of death and one or more debug log files which will indicate the location of the error.
-There will be multiple errors for various reasons.
-
-IF YOU RUN THE SCRIPT AGAIN IT WILL OVERWRITE YOUR CHANGES SO IMMEDIATELY RESET THE OPTIONS TO PREVENT THIS OR REMOVE/RENAME THE FILE.
+If the original language files were in use/registered, refreshing the shopfront will now result in a white screen of death and one or more debug log files which will indicate the location of the error. There will be multiple errors for various reasons.
 
 Use the information in the debug logs to correct the errors by comparing the file with the original.
-It will help to use a code editor to highlight syntax errors.
+It will help to use a code editor /IDE to highlight syntax errors.
 
-There will be a comment fragments breaking the format and embedded constants which need to be escaped with doubled percentage markers
+There will be comment fragments breaking the format and embedded constants which need to be escaped with doubled percentage markers.
 
 For example
 
@@ -78,22 +46,11 @@ becomes
 In the subdirectory `language/YOURLANGUAGE/`
 there are now a lot of files, old and new mixed.
 
-I suggest as you review/compare a file, rename the old one for future reference and eventual deletion
+I suggest as you review/compare a file, rename the extension of the old one from .php to something else (so it cannot be used) for future reference and eventual deletion
 
-e.g. `z_about_us.OLD php`
+e.g. `about_us.OLD php`
 
 Thus, they will both be visually separated from the lang. files and not be included as overrides to the lang. files.
-
-## How it works
-
-### Method 1
-Original attempt 
-The script parses the hard-coded paths and retrieves a list of the files therein.
-
-It parses each file using basic search and replace and creates a new file prefixed with `.lang` in the same place.
-
-### Method 2
-The script parses the files into tokens which works much better.
 
 ## Documentation Links 
 
@@ -101,4 +58,5 @@ The script parses the files into tokens which works much better.
 
 
 ## Creating/converting a language pack
-If you are creating a new language pack or renovating an old one, consider putting it on GitHub immediately as there will always be tweaks to do and it is far easier to add them there, than update a ZC Plugin file download each time. Also, it makes it easy for others to improve it.
+If you are creating a new language pack or renovating an old one, it's an exponential job (tends towards zero, but never actually gets there), there are always tweaks. 
+So, you should consider putting it on GitHub from the start as it is far easier to tweak that with minor changes, rather than creating/submitting a ZC Plugin file for submission each time you change a comma. Also, it makes it easy for others to improve it.
