@@ -70,6 +70,13 @@ if ($fileset_source === 'storefront') {
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/responsive_classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/responsive_classic/'
     ];
+
+    $custom_folders_storefront = [
+        DIR_FS_CATALOG_LANGUAGES . '/bootstrap/',
+        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/bootstrap/',
+    ];
+
+    $paths_to_scan = array_merge($paths_to_scan, $custom_folders_storefront);
 }
 
 // function only used for outputting formatted debugging output to browser
