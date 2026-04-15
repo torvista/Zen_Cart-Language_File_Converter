@@ -38,6 +38,7 @@ $legacy_file_action = empty($_POST['legacy_file_action']) ? 0 : (int)$_POST['leg
 unset($_POST);
 
 $paths_to_scan = [];
+
 if ($fileset_source === 'admin') {
     $paths_to_scan = [
         DIR_FS_ADMIN . DIR_WS_LANGUAGES,
@@ -57,33 +58,30 @@ if ($fileset_source === 'storefront') {
     $paths_to_scan = [
         DIR_FS_CATALOG_LANGUAGES,
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/extra_definitions/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/extra_definitions/classic/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/extra_definitions/responsive_classic/',
-        //DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/html_includes/',
-        //DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/html_includes/classic/',
-        //DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/html_includes/responsive_classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/order_total/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/order_total/classic/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/order_total/responsive_classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/payment/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/payment/classic/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/payment/responsive_classic/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/classic/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/modules/shipping/responsive_classic/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/responsive_classic/'
     ];
 
+    //Get all template folders
+    $templates = zen_get_catalog_template_directories();
+    foreach ($templates as $template_dir => $template_info) {
+        $paths_to_scan[] = DIR_FS_CATALOG_LANGUAGES . $language_to_convert . "/$template_dir/";
+        $paths_to_scan[] = DIR_FS_CATALOG_LANGUAGES . $language_to_convert . "/extra_definitions/$template_dir/";
+        $paths_to_scan[] = DIR_FS_CATALOG_LANGUAGES . $language_to_convert . "/modules/order_total/$template_dir/";
+        $paths_to_scan[] = DIR_FS_CATALOG_LANGUAGES . $language_to_convert . "/modules/payment/$template_dir/";
+        $paths_to_scan[] = DIR_FS_CATALOG_LANGUAGES . $language_to_convert . "/modules/shipping/$template_dir/";
+    }
+
+    //Custom folders to include
     $custom_folders_storefront = [
-        DIR_FS_CATALOG_LANGUAGES . '/bootstrap/',
-        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/bootstrap/',
     ];
 
+    //Files to exclude
     $files_to_skip = [
+        DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/extra_definitions/bootstrap/zca_bootstrap_id.php',
     ];
-
     $paths_to_scan = array_merge($paths_to_scan, $custom_folders_storefront);
 }
 
@@ -145,7 +143,6 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- DECLARE(strict_types=1); ----
         if ($tokenId === T_DECLARE && !$seenNonHeaderContent) {
-
             $declareStatement = '';
 
             for (; $i < $count; $i++) {
@@ -166,7 +163,6 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- DOCBLOCKS (/** */) ----
         if ($tokenId === T_DOC_COMMENT) {
-
             if (!$firstDocblockCaptured && !$seenNonHeaderContent) {
                 $output .= trim($tokenText) . "\n\n";
                 $firstDocblockCaptured = true;
@@ -188,7 +184,6 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- NORMAL COMMENTS ----
         if ($tokenId === T_COMMENT) {
-
             // Look ahead to next non-whitespace token
             $j = $i + 1;
             while ($j < $count && is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) {
@@ -227,7 +222,6 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- DEFINE HANDLING ----
         if ($tokenId === T_STRING && strtolower($tokenText) === 'define') {
-
             if ($startedArrayContent) {
                 $lineDiff = $tokenLine - $lastLine;
                 if ($lineDiff > 1) {
@@ -369,20 +363,26 @@ function handle_legacy_file(string $filename, int $legacy_file_action = 0): void
         <!-- body_text //-->
         <h1>Developer Tool: Create lang.*.php files from legacy Language Files</h1>
         <h2 class="mark">UNDER NO CIRCUMSTANCES SHOULD YOU EXECUTE THIS FILE ON YOUR WORKING/PRODUCTION SHOP: YOU WILL BREAK IT!</h2>
-        <p>The new files are unlikely to be 100% perfect and so will cause a white-screen-of-death (WSOD), requiring some manual fixes (just review the /log/debug files to determine where the fault lies).<br>
-            Consequently, you MUST use a duplicate (working) development copy of your shop to create and review the new files, stress-free.<br>
+        <h3>BEFORE you do ANYTHING, copy/make a backup of the current /language directories of both the Admin and Storefront!</h3>
+        <p>The new files created by this script are unlikely to be 100% perfect and so may cause a white-screen-of-death (WSOD), requiring some manual fixes (just review the /log/debug files to determine where the fault lies).<br>
+            Consequently, you MUST use a duplicate (working) development copy of your shop to create and review the new files, in your own time, stress-free.<br>
             As these are <b>new</b> files causing the problem, there is no irreparable damage, just work though the debugs, there should be very few.</p>
 
         <h3>Notes</h3>
-        <ul>
-            <li>The conversion only creates lang.* <b>equivalents</b> from the existing files. It will NOT add or remove constants to bring those files "up-to-date" to match the current english lang.* files.<br>
+        <ul class="list-group">
+            <li class="list-group-item">The conversion only creates lang.* <b>equivalents</b> from the existing files. It will NOT add or remove constants to bring those files "up-to-date" to match the current english lang.* files.<br>
                 Hence this initial creation is only the start of the process: you still <b>must</b> do a manual compare of the english files vs. your files to ensure that all definitions are in place/match their english equivalents (by using Beyond Compare or similar).
             </li>
 
-            <li>Do a Test Run to show the file paths being parsed...maybe you have some custom directory you need to add (in the script array).
+            <li class="list-group-item">The script parses ALL the template directories. If you don't want that to happen, you need to modify the section //Get all template folders
             </li>
 
-            <li>
+            <li class="list-group-item">Do a Test Run to show the file paths being parsed...LOOK AT THE RESULTS.<br>
+                Maybe you have some custom directory you want to add (in the array $custom_folders_storefront).
+                Maybe you have some files you don't want to add (in the array $files_to_skip).
+            </li>
+
+            <li class="list-group-item">
                 If the source file define is a constant whose value is another constant,<br>
                 e.g<br>
                 <pre>define('BOX_TOOLS_GOOGLE_MERCHANT_CENTER', BOX_CONFIGURATION_GOOGLE_MERCHANT_CENTER);//Tools Menu</pre>
@@ -391,17 +391,17 @@ function handle_legacy_file(string $filename, int $legacy_file_action = 0): void
                 <pre>'BOX_TOOLS_GOOGLE_MERCHANT_CENTER' => '%%BOX_CONFIGURATION_GOOGLE_MERCHANT_CENTER%%',</pre>
             </li>
 
-            <li>The script will use any existing legacy file to create a lang. equivalent.<br>
+            <li class="list-group-item">The script will use any existing legacy file to create a lang. equivalent.<br>
                 If you run it a second time, and have left the original files in place (not renamed), the lang. files will be created again, overwriting any fixes you have done.<br>
                 So...don't run it twice on the same fileset or remove/rename the legacy files.
             </li>
 
-            <li>
+            <li class="list-group-item">
                 Comments are welcome in the <a href="https://github.com/torvista/Zen_Cart-Language_File_Converter" target="_blank">GitHub</a>, code improvements even more so. Which would be a first.
             </li>
         </ul>
         <?php
-        echo zen_draw_form('lang_creator', basename($PHP_SELF), parameters: 'class="form-inline"');
+        echo zen_draw_form('lang_creator', basename($PHP_SELF), params: 'class="form-inline"');
         ?>
         <fieldset>
             <legend>Run Options</legend>
@@ -424,7 +424,7 @@ function handle_legacy_file(string $filename, int $legacy_file_action = 0): void
                 <label>Create the lang.* files <?= zen_draw_radio_field('create_files', '1', parameters: 'class="form-control" required') ?></label>
             </div>
             <br>
-            <button type="submit" onclick="return confirm('Sure?');">Run!</button>
+            <button type="submit" class="btn btn-success" onclick="return confirm('Sure?');">Run!</button>
         </fieldset>
         <?php
         echo '</form>';
