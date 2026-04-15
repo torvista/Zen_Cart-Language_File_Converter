@@ -1,13 +1,14 @@
 <?php
-// **** READ THE README FIRST *****
+// **** READ THE README FIRST (!!) *****
 // Place this file in your admin folder. Log into admin and manually type the filename ADMIN_FOLDER/dev-lang_creator.php.
 // (the "dev-" prefix hides the file from Git)
 
 declare(strict_types=1);
+
 /**
  * @link https://github.com/torvista/Zen_Cart-Language_File_Converter
  * @note uses tokens
- * @version $Id: 08/04/2026 torvista & ChatGPT
+ * @version $Id: 15 Apr 2026 torvista & ChatGPT
  */
 
 /**
@@ -122,6 +123,9 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
     $firstDocblockCaptured = false;
     $startedArrayContent = false;
+    $seenNonHeaderContent = false;
+
+    $pendingComment = null;
 
     $lastLine = 1;
 
@@ -132,13 +136,34 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
         $tokenText = is_array($token) ? $token[1] : $token;
         $tokenLine = is_array($token) ? $token[2] : $lastLine;
 
-        // ---- FIRST DOCBLOCK (top of file) ----
+        // ---- DECLARE(strict_types=1); ----
+        if ($tokenId === T_DECLARE && !$seenNonHeaderContent) {
+
+            $declareStatement = '';
+
+            for (; $i < $count; $i++) {
+                $t = $tokens[$i];
+                $text = is_array($t) ? $t[1] : $t;
+
+                $declareStatement .= $text;
+
+                if ($text === ';') {
+                    break;
+                }
+            }
+
+            $output .= trim($declareStatement) . "\n\n";
+            $lastLine = $tokenLine;
+            continue;
+        }
+
+        // ---- DOCBLOCKS (/** */) ----
         if ($tokenId === T_DOC_COMMENT) {
-            if (!$firstDocblockCaptured) {
+
+            if (!$firstDocblockCaptured && !$seenNonHeaderContent) {
                 $output .= trim($tokenText) . "\n\n";
                 $firstDocblockCaptured = true;
             } else {
-                // Inline docblocks
                 if ($startedArrayContent) {
                     $lineDiff = $tokenLine - $lastLine;
                     if ($lineDiff > 1) {
@@ -156,15 +181,38 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- NORMAL COMMENTS ----
         if ($tokenId === T_COMMENT) {
-            if ($startedArrayContent) {
-                $lineDiff = $tokenLine - $lastLine;
-                if ($lineDiff > 1) {
-                    $arrayBody .= str_repeat("\n", $lineDiff - 1);
-                }
+
+            // Look ahead to next non-whitespace token
+            $j = $i + 1;
+            while ($j < $count && is_array($tokens[$j]) && $tokens[$j][0] === T_WHITESPACE) {
+                $j++;
             }
 
-            $arrayBody .= "    " . trim($tokenText) . "\n";
-            $startedArrayContent = true;
+            $nextToken = $tokens[$j] ?? null;
+            $nextTokenId = is_array($nextToken) ? $nextToken[0] : null;
+            $nextTokenText = is_array($nextToken) ? strtolower($nextToken[1]) : $nextToken;
+
+            // Comment directly before define → store it
+            if ($nextTokenId === T_STRING && $nextTokenText === 'define') {
+                $pendingComment = trim($tokenText);
+                $lastLine = $tokenLine;
+                continue;
+            }
+
+            // Header comment
+            if (!$seenNonHeaderContent) {
+                $output .= trim($tokenText) . "\n";
+            } else {
+                if ($startedArrayContent) {
+                    $lineDiff = $tokenLine - $lastLine;
+                    if ($lineDiff > 1) {
+                        $arrayBody .= str_repeat("\n", $lineDiff - 1);
+                    }
+                }
+
+                $arrayBody .= "    " . trim($tokenText) . "\n";
+                $startedArrayContent = true;
+            }
 
             $lastLine = $tokenLine;
             continue;
@@ -172,6 +220,7 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
         // ---- DEFINE HANDLING ----
         if ($tokenId === T_STRING && strtolower($tokenText) === 'define') {
+
             if ($startedArrayContent) {
                 $lineDiff = $tokenLine - $lastLine;
                 if ($lineDiff > 1) {
@@ -180,7 +229,7 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
             }
 
             // Move to "("
-            while ($i < $count && ($tokens[$i] !== '(')) {
+            while ($i < $count && (!is_string($tokens[$i]) || $tokens[$i] !== '(')) {
                 $i++;
             }
 
@@ -193,11 +242,11 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
             $constName = trim($tokens[$i][1], "'\"");
 
             // Move to comma
-            while ($i < $count && ($tokens[$i] !== ',')) {
+            while ($i < $count && (!is_string($tokens[$i]) || $tokens[$i] !== ',')) {
                 $i++;
             }
 
-            // ---- CAPTURE VALUE (supports arrays, nested, multiline) ----
+            // ---- CAPTURE VALUE ----
             $i++;
             $value = '';
             $parenDepth = 1;
@@ -220,17 +269,32 @@ function convertFileToLang(string $source_filename, bool $create_file = false): 
 
             $value = trim($value);
 
-            // Add to array
-            $arrayBody .= "    '$constName' => $value,\n";
+            // Output pending comment ABOVE define
+            if ($pendingComment !== null) {
+                $arrayBody .= "    {$pendingComment}\n";
+                $pendingComment = null;
+            }
+
+            $arrayBody .= "    '{$constName}' => {$value},\n";
             $startedArrayContent = true;
 
             // Skip to semicolon
-            while ($i < $count && ($tokens[$i] !== ';')) {
+            while ($i < $count && (!is_string($tokens[$i]) || $tokens[$i] !== ';')) {
                 $i++;
             }
 
             $lastLine = $tokenLine;
             continue;
+        }
+
+        // ---- TRACK HEADER BREAK ----
+        if (
+            $tokenId !== T_WHITESPACE &&
+            $tokenId !== T_OPEN_TAG &&
+            $tokenId !== T_DOC_COMMENT &&
+            $tokenId !== T_DECLARE
+        ) {
+            $seenNonHeaderContent = true;
         }
 
         $lastLine = $tokenLine;
