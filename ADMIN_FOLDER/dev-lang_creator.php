@@ -47,6 +47,10 @@ if ($fileset_source === 'admin') {
         //plugins
         DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/dbio/',
     ];
+
+    $files_to_skip = [
+        DIR_FS_ADMIN . DIR_WS_LANGUAGES . $language_to_convert . '/' . 'ih_about.php',
+    ];
 }
 
 if ($fileset_source === 'storefront') {
@@ -75,6 +79,9 @@ if ($fileset_source === 'storefront') {
     $custom_folders_storefront = [
         DIR_FS_CATALOG_LANGUAGES . '/bootstrap/',
         DIR_FS_CATALOG_LANGUAGES . $language_to_convert . '/bootstrap/',
+    ];
+
+    $files_to_skip = [
     ];
 
     $paths_to_scan = array_merge($paths_to_scan, $custom_folders_storefront);
@@ -446,7 +453,10 @@ function handle_legacy_file(string $filename, int $legacy_file_action = 0): void
                 //filter out any pre-existing lang.*.php files
                 $file_list = preg_grep("/lang\./", $file_list, PREG_GREP_INVERT);
 
-                echo '$file_list: pre-existing lang.*.php files removed';
+                //filter out excluded files
+                $file_list = array_diff($file_list, $files_to_skip);
+
+                echo '$file_list: pre-existing lang.*.php and excluded files removed';
                 mv_printVar($file_list);
 
                 foreach ($file_list as $filename) {
